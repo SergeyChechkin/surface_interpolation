@@ -84,10 +84,6 @@ TEST(SurfaceInterpolation, SurfaceInterpolation_1) {
     ASSERT_NEAR(0, surf->coefficients_[7], error);
     ASSERT_NEAR(0, surf->coefficients_[8], error);
     ASSERT_NEAR(0, surf->coefficients_[9], error);
-
-    auto surf_1 = algrtm.ComputeSurface(points);
-    std::cout << surf_1->coefficients_.transpose() << std::endl;
-
 }
 
 int main(int argc, char **argv) {

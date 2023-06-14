@@ -86,8 +86,7 @@ public:
         result.transform_.linear() = QuaternionT::FromTwoVectors(eigen_solver.eigenvectors().col(0), PointT(0, 0, 1)).toRotationMatrix();
         result.transform_.translation() = -(result.transform_.linear() * mean);
         auto eigenvalues = eigen_solver.eigenvalues(); 
-        T patch_size = T(0.5) * (eigenvalues[1] + eigenvalues[2]);
-        
+        T patch_size = std::sqrt(eigenvalues[1]) + std::sqrt(eigenvalues[2]);
         // convert points to local plane frame
         PointsVectorT local_patch_points = result.transform_ * patch_points;
         // Interpolate surface with weigthed least sdquare 
