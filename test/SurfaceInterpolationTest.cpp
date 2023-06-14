@@ -2,6 +2,7 @@
 /// Copyright (c) 2023, Sergey Chechkin
 /// Autor: Sergey Chechkin, schechkin@gmail.com 
 
+
 #include "surface_interpolation/Surface3D.h"
 #include "surface_interpolation/SurfaceInterpolation.h"
 #include <gtest/gtest.h>
@@ -56,16 +57,34 @@ TEST(SurfaceInterpolation, SurfaceModel) {
     ASSERT_EQ(val3, 1);
 }
 
-TEST(SurfaceInterpolation, SurfaceInterpolation) {
+TEST(SurfaceInterpolation, SurfaceInterpolation_1) {
     SurfaceInterpolation<SurfacePolynomial_3<float>, float> algrtm;
+    int points_count = 10000;
+    float patch_size = 0.1;
 
-    Eigen::Matrix<float, 3, Eigen::Dynamic> points(3, 10);
-    auto surf = algrtm.ComputeSurface(points, Eigen::Vector3f(0, 0, 0), 1);
-
-//    Eigen::Isometry3d trans;
-//    Eigen::Matrix<double, 3, Eigen::Dynamic> trans_points = trans * points;
+    std::default_random_engine g;
+    std::uniform_real_distribution<float> v(-patch_size, patch_size);
+    Eigen::Matrix<float, 3, Eigen::Dynamic> points(3, points_count);
+    for(int i = 0; i < points_count; ++i) {
+        float x = v(g);
+        float y = v(g);
+        points.col(i) << x, y, 1.0f + 0.5 * x * x + 0.5 * y * y;
+    }
+    
+    auto surf = algrtm.ComputeSurface(points, {0, 0, 1}, patch_size);
+    
+    double error = 0.001;
+    ASSERT_NEAR(0, surf->coefficients_[0], error);
+    ASSERT_NEAR(0, surf->coefficients_[1], error);
+    ASSERT_NEAR(0, surf->coefficients_[2], error);
+    ASSERT_NEAR(0.5, surf->coefficients_[3], error);
+    ASSERT_NEAR(0.5, surf->coefficients_[4], error);
+    ASSERT_NEAR(0, surf->coefficients_[5], error);
+    ASSERT_NEAR(0, surf->coefficients_[6], error);
+    ASSERT_NEAR(0, surf->coefficients_[7], error);
+    ASSERT_NEAR(0, surf->coefficients_[8], error);
+    ASSERT_NEAR(0, surf->coefficients_[9], error);
 }
-
 
 int main(int argc, char **argv) {
     testing::InitGoogleTest(&argc, argv);
