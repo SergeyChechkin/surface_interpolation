@@ -106,6 +106,34 @@ public:
 
         return result;
     }
+
+    static Eigen::Matrix2<T> ShapeOperator(const SurfacePatch& surface) {
+        // Surface derivatives
+        T df_dx = ModelType::df_dx(0, 0, surface.coefficients_);
+        T df_dy = ModelType::df_dy(0, 0, surface.coefficients_);
+        T df2_dxx = ModelType::df2_dxx(0, 0, surface.coefficients_);
+        T df2_dyy = ModelType::df2_dyy(0, 0, surface.coefficients_);
+        T df2_dxy = ModelType::df2_dxy(0, 0, surface.coefficients_);
+        // Normal
+        PointT n = PointType(-df_dx, -df_dy, 1).normalized();
+        // Parametric surface
+        PointT rx(1, 0, df_dx);
+        PointT ry(0, 1, df_dy);
+        PointT rxx(0, 0, df2_dxx);
+        PointT ryy(0, 0, df2_dyy);
+        PointT rxy(0, 0, df2_dxy);
+        // First fundamental form
+        float E = rx.dot(rx);
+        float F = rx.dot(ry);
+        float G = ry.dot(ry);
+        // Second fundamental form
+        float L = rxx.dot(n);
+        float M = rxy.dot(n);
+        float N = ryy.dot(n);
+        Eigen::Matrix2<T> P1 {{L, M}, {M, N}};
+        Eigen::Matrix2<T> P2 {{E, F}, {F, G}};
+        return P1 * P2.inverse();
+    }
 };
 
 }
