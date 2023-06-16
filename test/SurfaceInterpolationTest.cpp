@@ -72,6 +72,9 @@ TEST(SurfaceInterpolation, SurfaceInterpolation_1) {
     }
     
     auto surf = algrtm.ComputeSurface(points, {0, 0, 1}, patch_size);
+    auto  pc = algrtm.PrincipalCurvatures(*surf);
+
+    std::cout << *pc << std::endl;
     
     double error = 0.001;
     ASSERT_NEAR(0, surf->coefficients_[0], error);
