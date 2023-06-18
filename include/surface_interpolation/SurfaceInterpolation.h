@@ -13,6 +13,9 @@
 
 namespace lib::surface_interpolation {
 
+/// @brief Surface interpolation functions 
+/// @tparam ModelType - surface model type 
+/// @tparam T - scalar type (float, double) 
 template <typename ModelType, typename T>
 class SurfaceInterpolation {
 public:
@@ -27,6 +30,10 @@ public:
         CoefT coefficients_;
     };
 
+    /// @brief Compute surface patch, using patch mean point as a patch center.   
+    /// @param patch_points - point cloud patch
+    /// @param patch_radius - patch radius, only used for weight computation 
+    /// @return - surface patch
     static std::optional<SurfacePatch> ComputeSurface(
         const PointsVectorT& patch_points,
         T patch_radius) {
@@ -34,6 +41,11 @@ public:
             return ComputeSurface(patch_points, mean, patch_radius);
         }
 
+    /// @brief Compute surface patch
+    /// @param patch_points - point cloud patch
+    /// @param center_point - patch center
+    /// @param patch_radius - patch radius, only used for weight computation 
+    /// @return - surface patch 
     static std::optional<SurfacePatch> ComputeSurface(
         const PointsVectorT& patch_points,
         const PointT& center_point,
@@ -55,7 +67,7 @@ public:
         
         // convert points to local plane frame
         PointsVectorT local_patch_points = result.transform_ * patch_points;
-        // Interpolate surface with weigthed least sdquare 
+        // Interpolate surface with weighted least square 
         const T patch_radius_sqr = patch_radius * patch_radius;
         size_t size = local_patch_points.cols();
         Eigen::MatrixX<T> J = Eigen::MatrixX<T>(size, ModelType::size_);
@@ -73,6 +85,9 @@ public:
         return result;
     }
 
+    /// @brief Compute surface patch
+    /// @param patch_points - point cloud patch
+    /// @return - surface patch 
     static std::optional<SurfacePatch> ComputeSurface(const PointsVectorT& patch_points) {
         auto mean = patch_points.rowwise().mean();
         Eigen::MatrixX<T> centered = (patch_points.colwise() - mean).transpose();
@@ -107,6 +122,10 @@ public:
         return result;
     }
 
+    /// @brief Compute shape operator for specified point, projected on surface. 
+    /// @param surface - surface patch  
+    /// @param point - point of interest 
+    /// @return 2x2 shape operator matrix 
     static Eigen::Matrix2<T> ShapeOperator(const SurfacePatch& surface, const Eigen::Vector3<T>& point) {
         Eigen::Vector3<T> patch_points = surface.transform_ * point;
         T x = patch_points[0];
@@ -117,7 +136,7 @@ public:
         T df2_dxx = ModelType::df2_dxx(x, y, surface.coefficients_.data());
         T df2_dyy = ModelType::df2_dyy(x, y, surface.coefficients_.data());
         T df2_dxy = ModelType::df2_dxy(x, y, surface.coefficients_.data());
-        // Normal
+        // Normal vector
         PointT n = PointT(-df_dx, -df_dy, 1).normalized();
         // Parametric surface
         PointT rx(1, 0, df_dx);
@@ -138,6 +157,10 @@ public:
         return P1 * P2.inverse();
     }
 
+    /// @brief Compute principal curvatures from shape operator 
+    /// @param surface - surface patch  
+    /// @param point - point of interest 
+    /// @return - principal curvatures
     static std::optional<Eigen::Vector2<T>> PrincipalCurvatures(const SurfacePatch& surface, const Eigen::Vector3<T>& point) {
         Eigen::Matrix2<T> so = ShapeOperator(surface, point);
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix2<T>> eigen_solver(so);

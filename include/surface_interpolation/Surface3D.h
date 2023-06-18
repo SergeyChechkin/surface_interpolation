@@ -10,6 +10,8 @@ namespace lib::surface_interpolation {
 
 // 3D surface models
 
+/// @brief Second degree polynomial surface model 
+/// @tparam T scalar type (float, double)
 template<typename T>
 class SurfacePolynomial_2 {
 public:
@@ -46,6 +48,8 @@ public:
     }
 };
 
+/// @brief Third degree polynomial surface model 
+/// @tparam T - scalar type (float, double)
 template<typename T>
 class SurfacePolynomial_3 {
 public:
