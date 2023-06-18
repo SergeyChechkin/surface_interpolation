@@ -107,13 +107,16 @@ public:
         return result;
     }
 
-    static Eigen::Matrix2<T> ShapeOperator(const SurfacePatch& surface) {
+    static Eigen::Matrix2<T> ShapeOperator(const SurfacePatch& surface, const Eigen::Vector3<T>& point) {
+        Eigen::Vector3<T> patch_points = surface.transform_ * point;
+        T x = patch_points[0];
+        T y = patch_points[1];
         // Surface derivatives
-        T df_dx = ModelType::df_dx(0, 0, surface.coefficients_.data());
-        T df_dy = ModelType::df_dy(0, 0, surface.coefficients_.data());
-        T df2_dxx = ModelType::df2_dxx(0, 0, surface.coefficients_.data());
-        T df2_dyy = ModelType::df2_dyy(0, 0, surface.coefficients_.data());
-        T df2_dxy = ModelType::df2_dxy(0, 0, surface.coefficients_.data());
+        T df_dx = ModelType::df_dx(x, y, surface.coefficients_.data());
+        T df_dy = ModelType::df_dy(x, y, surface.coefficients_.data());
+        T df2_dxx = ModelType::df2_dxx(x, y, surface.coefficients_.data());
+        T df2_dyy = ModelType::df2_dyy(x, y, surface.coefficients_.data());
+        T df2_dxy = ModelType::df2_dxy(x, y, surface.coefficients_.data());
         // Normal
         PointT n = PointT(-df_dx, -df_dy, 1).normalized();
         // Parametric surface
@@ -123,20 +126,20 @@ public:
         PointT ryy(0, 0, df2_dyy);
         PointT rxy(0, 0, df2_dxy);
         // First fundamental form
-        float E = rx.dot(rx);
-        float F = rx.dot(ry);
-        float G = ry.dot(ry);
+        T E = rx.dot(rx);
+        T F = rx.dot(ry);
+        T G = ry.dot(ry);
         // Second fundamental form
-        float L = rxx.dot(n);
-        float M = rxy.dot(n);
-        float N = ryy.dot(n);
+        T L = rxx.dot(n);
+        T M = rxy.dot(n);
+        T N = ryy.dot(n);
         Eigen::Matrix2<T> P1 {{L, M}, {M, N}};
         Eigen::Matrix2<T> P2 {{E, F}, {F, G}};
         return P1 * P2.inverse();
     }
 
-    static std::optional<Eigen::Vector2<T>> PrincipalCurvatures(const SurfacePatch& surface) {
-        Eigen::Matrix2<T> so = ShapeOperator(surface);
+    static std::optional<Eigen::Vector2<T>> PrincipalCurvatures(const SurfacePatch& surface, const Eigen::Vector3<T>& point) {
+        Eigen::Matrix2<T> so = ShapeOperator(surface, point);
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix2<T>> eigen_solver(so);
 
         if(Eigen::Success != eigen_solver.info())
