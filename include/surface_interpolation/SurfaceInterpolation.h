@@ -20,6 +20,7 @@ template <typename ModelType, typename T>
 class SurfaceInterpolation {
 public:
     using PointT = Eigen::Vector3<T>;
+    using MatrixT = Eigen::Matrix3<T>;
     using QuaternionT = Eigen::Quaternion<T>;
     using PointsVectorT = Eigen::Matrix<T, 3, Eigen::Dynamic>;
     using CoefT = typename ModelType::VectorT;
@@ -37,7 +38,7 @@ public:
     static std::optional<SurfacePatch> ComputeSurface(
         const PointsVectorT& patch_points,
         T patch_radius) {
-            auto mean = patch_points.rowwise().mean();
+            const auto mean = patch_points.rowwise().mean();
             return ComputeSurface(patch_points, mean, patch_radius);
         }
 
@@ -51,14 +52,13 @@ public:
         const PointT& center_point,
         T patch_radius) {
 
-        Eigen::MatrixX<T> centered = (patch_points.colwise() - center_point).transpose();
-        Eigen::MatrixX<T> cov = (centered.adjoint() * centered) / T(patch_points.cols());
+        const auto cov = computeCovariance(patch_points, center_point);
 
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix3<T>> eigen_solver(cov);
         if(Eigen::Success != eigen_solver.info())
             return {};
             
-        PointT plane_normal = eigen_solver.eigenvectors().col(0);
+        const PointT plane_normal = eigen_solver.eigenvectors().col(0);
 
         SurfacePatch result;
         // compute transfromation to local frame
@@ -66,10 +66,10 @@ public:
         result.transform_.translation() = -(result.transform_.linear() * center_point);
         
         // convert points to local plane frame
-        PointsVectorT local_patch_points = result.transform_ * patch_points;
+        const PointsVectorT local_patch_points = result.transform_ * patch_points;
         // Interpolate surface with weighted least square 
         const T patch_radius_sqr = patch_radius * patch_radius;
-        size_t size = local_patch_points.cols();
+        const size_t size = local_patch_points.cols();
         Eigen::MatrixX<T> J = Eigen::MatrixX<T>(size, ModelType::size_);
         Eigen::MatrixX<T> r = Eigen::MatrixX<T>(size, 1);
         Eigen::MatrixX<T> W(size, 1);
@@ -79,7 +79,7 @@ public:
             r(i, 0) = point[2];
             W(i, 0) = std::exp(-point.squaredNorm() / patch_radius_sqr);
         }
-        Eigen::MatrixX<T> JtW = J.transpose() * W.array().matrix().asDiagonal(); 
+        const auto JtW = J.transpose() * W.array().matrix().asDiagonal(); 
         result.coefficients_ = (JtW * J).inverse() * (JtW * r);
 
         return result;
@@ -89,24 +89,23 @@ public:
     /// @param patch_points - point cloud patch
     /// @return - surface patch 
     static std::optional<SurfacePatch> ComputeSurface(const PointsVectorT& patch_points) {
-        auto mean = patch_points.rowwise().mean();
-        Eigen::MatrixX<T> centered = (patch_points.colwise() - mean).transpose();
-        Eigen::MatrixX<T> cov = (centered.adjoint() * centered) / T(patch_points.cols());
-        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3<T>> eigen_solver(cov);
+        const auto mean = patch_points.rowwise().mean();
+        const auto cov = computeCovariance(patch_points, mean);
 
+        Eigen::SelfAdjointEigenSolver<Eigen::Matrix3<T>> eigen_solver(cov);
         if(Eigen::Success != eigen_solver.info())
             return {};
         
         SurfacePatch result;
         result.transform_.linear() = QuaternionT::FromTwoVectors(eigen_solver.eigenvectors().col(0), PointT(0, 0, 1)).toRotationMatrix();
         result.transform_.translation() = -(result.transform_.linear() * mean);
-        auto eigenvalues = eigen_solver.eigenvalues(); 
+        const auto eigenvalues = eigen_solver.eigenvalues(); 
         T patch_size = std::sqrt(eigenvalues[1]) + std::sqrt(eigenvalues[2]);
         // convert points to local plane frame
-        PointsVectorT local_patch_points = result.transform_ * patch_points;
+        const PointsVectorT local_patch_points = result.transform_ * patch_points;
         // Interpolate surface with weigthed least sdquare 
         const T patch_radius_sqr = patch_size * patch_size;
-        size_t size = local_patch_points.cols();
+        const size_t size = local_patch_points.cols();
         Eigen::MatrixX<T> J = Eigen::MatrixX<T>(size, ModelType::size_);
         Eigen::MatrixX<T> r = Eigen::MatrixX<T>(size, 1);
         Eigen::MatrixX<T> W(size, 1);
@@ -116,7 +115,7 @@ public:
             r(i, 0) = point[2];
             W(i, 0) = std::exp(-point.squaredNorm() / patch_radius_sqr);
         }
-        Eigen::MatrixX<T> JtW = J.transpose() * W.array().matrix().asDiagonal(); 
+        const auto JtW = J.transpose() * W.array().matrix().asDiagonal(); 
         result.coefficients_ = (JtW * J).inverse() * (JtW * r);
 
         return result;
@@ -127,33 +126,33 @@ public:
     /// @param point - point of interest 
     /// @return 2x2 shape operator matrix 
     static Eigen::Matrix2<T> ShapeOperator(const SurfacePatch& surface, const Eigen::Vector3<T>& point) {
-        Eigen::Vector3<T> patch_points = surface.transform_ * point;
-        T x = patch_points[0];
-        T y = patch_points[1];
+        const Eigen::Vector3<T> patch_points = surface.transform_ * point;
+        const T x = patch_points[0];
+        const T y = patch_points[1];
         // Surface derivatives
-        T df_dx = ModelType::df_dx(x, y, surface.coefficients_.data());
-        T df_dy = ModelType::df_dy(x, y, surface.coefficients_.data());
-        T df2_dxx = ModelType::df2_dxx(x, y, surface.coefficients_.data());
-        T df2_dyy = ModelType::df2_dyy(x, y, surface.coefficients_.data());
-        T df2_dxy = ModelType::df2_dxy(x, y, surface.coefficients_.data());
+        const T df_dx = ModelType::df_dx(x, y, surface.coefficients_.data());
+        const T df_dy = ModelType::df_dy(x, y, surface.coefficients_.data());
+        const T df2_dxx = ModelType::df2_dxx(x, y, surface.coefficients_.data());
+        const T df2_dyy = ModelType::df2_dyy(x, y, surface.coefficients_.data());
+        const T df2_dxy = ModelType::df2_dxy(x, y, surface.coefficients_.data());
         // Normal vector
-        PointT n = PointT(-df_dx, -df_dy, 1).normalized();
+        const PointT n = PointT(-df_dx, -df_dy, 1).normalized();
         // Parametric surface
-        PointT rx(1, 0, df_dx);
-        PointT ry(0, 1, df_dy);
-        PointT rxx(0, 0, df2_dxx);
-        PointT ryy(0, 0, df2_dyy);
-        PointT rxy(0, 0, df2_dxy);
+        const PointT rx(1, 0, df_dx);
+        const PointT ry(0, 1, df_dy);
+        const PointT rxx(0, 0, df2_dxx);
+        const PointT ryy(0, 0, df2_dyy);
+        const PointT rxy(0, 0, df2_dxy);
         // First fundamental form
-        T E = rx.dot(rx);
-        T F = rx.dot(ry);
-        T G = ry.dot(ry);
+        const T E = rx.dot(rx);
+        const T F = rx.dot(ry);
+        const T G = ry.dot(ry);
         // Second fundamental form
-        T L = rxx.dot(n);
-        T M = rxy.dot(n);
-        T N = ryy.dot(n);
-        Eigen::Matrix2<T> P1 {{L, M}, {M, N}};
-        Eigen::Matrix2<T> P2 {{E, F}, {F, G}};
+        const T L = rxx.dot(n);
+        const T M = rxy.dot(n);
+        const T N = ryy.dot(n);
+        const Eigen::Matrix2<T> P1 {{L, M}, {M, N}};
+        const Eigen::Matrix2<T> P2 {{E, F}, {F, G}};
         return P1 * P2.inverse();
     }
 
@@ -162,7 +161,7 @@ public:
     /// @param point - point of interest 
     /// @return - principal curvatures
     static std::optional<Eigen::Vector2<T>> PrincipalCurvatures(const SurfacePatch& surface, const Eigen::Vector3<T>& point) {
-        Eigen::Matrix2<T> so = ShapeOperator(surface, point);
+        const Eigen::Matrix2<T> so = ShapeOperator(surface, point);
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix2<T>> eigen_solver(so);
 
         if(Eigen::Success != eigen_solver.info())
@@ -170,6 +169,22 @@ public:
 
         return eigen_solver.eigenvalues();
     }
+private:
+    static MatrixT computeCovariance(const PointsVectorT& patch_points, const PointT& mean) {
+        MatrixT result;
+        result.setZero();
+
+        const size_t size = patch_points.cols();
+        for(size_t i = 0; i < size; ++i) {
+            const PointT point = patch_points.col(i);
+            const PointT centered_point = point - mean;
+            result += centered_point * centered_point.transpose(); 
+        }
+        
+        result *= 1.0 / T(size);
+
+        return result;
+    }  
 };
 
 }
