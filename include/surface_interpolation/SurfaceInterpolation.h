@@ -51,7 +51,6 @@ public:
         const PointsVectorT& patch_points,
         const PointT& center_point,
         T patch_radius) {
-
         const auto cov = computeCovariance(patch_points, center_point);
 
         Eigen::SelfAdjointEigenSolver<Eigen::Matrix3<T>> eigen_solver(cov);
@@ -61,31 +60,16 @@ public:
         const PointT plane_normal = eigen_solver.eigenvectors().col(0);
 
         SurfacePatch result;
-        // compute transfromation to local frame
+        // Compute transformation from point cloud frame to surface frame.
         result.transform_.linear() = QuaternionT::FromTwoVectors(plane_normal, PointT(0, 0, 1)).toRotationMatrix();
         result.transform_.translation() = -(result.transform_.linear() * center_point);
         
-        // convert points to local plane frame
-        const PointsVectorT local_patch_points = result.transform_ * patch_points;
         // Interpolate surface with weighted least square 
-        const T patch_radius_sqr = patch_radius * patch_radius;
-        const size_t size = local_patch_points.cols();
-        Eigen::MatrixX<T> J = Eigen::MatrixX<T>(size, ModelType::size_);
-        Eigen::MatrixX<T> r = Eigen::MatrixX<T>(size, 1);
-        Eigen::MatrixX<T> W(size, 1);
-        for(size_t i = 0; i < size; ++i) {
-            const auto point = local_patch_points.col(i);
-            J.row(i) = ModelType::df_dc(point[0], point[1]);
-            r(i, 0) = point[2];
-            W(i, 0) = std::exp(-point.squaredNorm() / patch_radius_sqr);
-        }
-        const auto JtW = J.transpose() * W.array().matrix().asDiagonal(); 
-        result.coefficients_ = (JtW * J).inverse() * (JtW * r);
-
+        interpolateSurface(result, patch_points, patch_radius);
         return result;
     }
 
-    /// @brief Compute surface patch
+    /// @brief Compute surface patch. Extract additional parameters from the point cloud patch.
     /// @param patch_points - point cloud patch
     /// @return - surface patch 
     static std::optional<SurfacePatch> ComputeSurface(const PointsVectorT& patch_points) {
@@ -97,27 +81,14 @@ public:
             return {};
         
         SurfacePatch result;
+        // Compute transformation from point cloud frame to surface frame.
         result.transform_.linear() = QuaternionT::FromTwoVectors(eigen_solver.eigenvectors().col(0), PointT(0, 0, 1)).toRotationMatrix();
         result.transform_.translation() = -(result.transform_.linear() * mean);
         const auto eigenvalues = eigen_solver.eigenvalues(); 
         T patch_size = std::sqrt(eigenvalues[1]) + std::sqrt(eigenvalues[2]);
-        // convert points to local plane frame
-        const PointsVectorT local_patch_points = result.transform_ * patch_points;
+        
         // Interpolate surface with weigthed least sdquare 
-        const T patch_radius_sqr = patch_size * patch_size;
-        const size_t size = local_patch_points.cols();
-        Eigen::MatrixX<T> J = Eigen::MatrixX<T>(size, ModelType::size_);
-        Eigen::MatrixX<T> r = Eigen::MatrixX<T>(size, 1);
-        Eigen::MatrixX<T> W(size, 1);
-        for(size_t i = 0; i < size; ++i) {
-            const auto point = local_patch_points.col(i);
-            J.row(i) = ModelType::df_dc(point[0], point[1]);
-            r(i, 0) = point[2];
-            W(i, 0) = std::exp(-point.squaredNorm() / patch_radius_sqr);
-        }
-        const auto JtW = J.transpose() * W.array().matrix().asDiagonal(); 
-        result.coefficients_ = (JtW * J).inverse() * (JtW * r);
-
+        interpolateSurface(result, patch_points, patch_size);
         return result;
     }
 
@@ -170,6 +141,9 @@ public:
         return eigen_solver.eigenvalues();
     }
 private:
+    /// @brief Compute covariance matrix 
+    /// @param patch_points - point cloud patch
+    /// @param mean - patch center
     static MatrixT computeCovariance(const PointsVectorT& patch_points, const PointT& mean) {
         MatrixT result;
         result.setZero();
@@ -184,7 +158,31 @@ private:
         result *= 1.0 / T(size);
 
         return result;
-    }  
+    }
+    
+    /// @brief Interpolate surface with weigthed least sdquare  
+    /// @param surface - surfase object
+    /// @param patch_points - point cloud patch
+    /// @param patch_size - patch radius
+    static void interpolateSurface(
+        SurfacePatch& surface, 
+        const PointsVectorT& patch_points, 
+        T patch_size) {
+            const size_t size = patch_points.cols();  
+            const T patch_radius_sqr = patch_size * patch_size;
+            Eigen::MatrixX<T> J = Eigen::MatrixX<T>(size, ModelType::size_);
+            Eigen::MatrixX<T> r = Eigen::MatrixX<T>(size, 1);
+            Eigen::MatrixX<T> W(size, 1);
+            for(size_t i = 0; i < size; ++i) {
+                // convert point to local plane frame
+                const auto point = surface.transform_ * patch_points.col(i);
+                J.row(i) = ModelType::df_dc(point[0], point[1]);
+                r(i, 0) = point[2];
+                W(i, 0) = std::exp(-point.squaredNorm() / patch_radius_sqr);
+            }
+            const auto JtW = J.transpose() * W.array().matrix().asDiagonal(); 
+            surface.coefficients_ = (JtW * J).inverse() * (JtW * r);
+        }
 };
 
 }
