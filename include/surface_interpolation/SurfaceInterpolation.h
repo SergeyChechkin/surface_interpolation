@@ -35,7 +35,7 @@ public:
     /// @param patch_points - point cloud patch
     /// @param patch_radius - patch radius, only used for weight computation 
     /// @return - surface patch
-    static std::optional<SurfacePatch> ComputeSurface(
+    std::optional<SurfacePatch> ComputeSurface(
         const PointsVectorT& patch_points,
         T patch_radius) {
             const auto mean = patch_points.rowwise().mean();
@@ -47,7 +47,7 @@ public:
     /// @param center_point - patch center
     /// @param patch_radius - patch radius, only used for weight computation 
     /// @return - surface patch 
-    static std::optional<SurfacePatch> ComputeSurface(
+    std::optional<SurfacePatch> ComputeSurface(
         const PointsVectorT& patch_points,
         const PointT& center_point,
         T patch_radius) {
@@ -72,7 +72,7 @@ public:
     /// @brief Compute surface patch. Extract additional parameters from the point cloud patch.
     /// @param patch_points - point cloud patch
     /// @return - surface patch 
-    static std::optional<SurfacePatch> ComputeSurface(const PointsVectorT& patch_points) {
+    std::optional<SurfacePatch> ComputeSurface(const PointsVectorT& patch_points) {
         const auto mean = patch_points.rowwise().mean();
         const auto cov = computeCovariance(patch_points, mean);
 
@@ -144,7 +144,7 @@ private:
     /// @brief Compute covariance matrix 
     /// @param patch_points - point cloud patch
     /// @param mean - patch center
-    static MatrixT computeCovariance(const PointsVectorT& patch_points, const PointT& mean) {
+    MatrixT computeCovariance(const PointsVectorT& patch_points, const PointT& mean) {
         MatrixT result;
         result.setZero();
 
@@ -164,16 +164,17 @@ private:
     /// @param surface - surfase object
     /// @param patch_points - point cloud patch
     /// @param patch_size - patch radius
-    static void interpolateSurface(
+    void interpolateSurface(
         SurfacePatch& surface, 
         const PointsVectorT& patch_points, 
         T patch_size) {
             const size_t size = patch_points.cols();  
             const T patch_radius_sqr = patch_size * patch_size;
-            // TODO: pre-allocate this memory
-            Eigen::MatrixX<T> J = Eigen::MatrixX<T>(size, ModelType::size_);
-            Eigen::MatrixX<T> r = Eigen::MatrixX<T>(size, 1);
-            Eigen::MatrixX<T> W(size, 1);
+            // pre-allocate memory
+            allocatedMemory(size);
+            auto J = Eigen::Map<Eigen::MatrixX<T>>(J_vec_.data(), size, ModelType::size_);
+            auto r = Eigen::Map<Eigen::MatrixX<T>>(r_vec_.data(), size, 1);
+            auto W = Eigen::Map<Eigen::MatrixX<T>>(W_vec_.data(), size, 1);
             for(size_t i = 0; i < size; ++i) {
                 // convert point to local plane frame
                 const auto point = surface.transform_ * patch_points.col(i);
@@ -181,9 +182,21 @@ private:
                 r(i, 0) = point[2];
                 W(i, 0) = std::exp(-point.squaredNorm() / patch_radius_sqr);
             }
+            // Solve weigthed least sdquare 
             const auto JtW = J.transpose() * W.array().matrix().asDiagonal(); 
             surface.coefficients_ = (JtW * J).inverse() * (JtW * r);
         }
+
+    inline void allocatedMemory(size_t size) {
+        J_vec_.resize(ModelType::size_ * size);
+        r_vec_.resize(size); 
+        W_vec_.resize(size); 
+    }    
+
+    //pre-allocated memory for large matrix operations    
+    std::vector<T> J_vec_;
+    std::vector<T> r_vec_;
+    std::vector<T> W_vec_;
 };
 
 }
