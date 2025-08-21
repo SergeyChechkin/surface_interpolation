@@ -154,9 +154,8 @@ private:
             const PointT centered_point = point - mean;
             result += centered_point * centered_point.transpose(); 
         }
-        
         result *= 1.0 / T(size);
-
+        
         return result;
     }
     
@@ -171,7 +170,7 @@ private:
             const size_t size = patch_points.cols();  
             const T patch_radius_sqr = patch_size * patch_size;
             // pre-allocate memory
-            allocatedMemory(size);
+            allocateMemory(size);
             auto J = Eigen::Map<Eigen::MatrixX<T>>(J_vec_.data(), size, ModelType::size_);
             auto r = Eigen::Map<Eigen::MatrixX<T>>(r_vec_.data(), size, 1);
             auto W = Eigen::Map<Eigen::MatrixX<T>>(W_vec_.data(), size, 1);
@@ -187,7 +186,7 @@ private:
             surface.coefficients_ = (JtW * J).inverse() * (JtW * r);
         }
 
-    inline void allocatedMemory(size_t size) {
+    inline void allocateMemory(size_t size) {
         J_vec_.resize(ModelType::size_ * size);
         r_vec_.resize(size); 
         W_vec_.resize(size); 
