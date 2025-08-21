@@ -170,6 +170,7 @@ private:
         T patch_size) {
             const size_t size = patch_points.cols();  
             const T patch_radius_sqr = patch_size * patch_size;
+            // TODO: pre-allocate this memory
             Eigen::MatrixX<T> J = Eigen::MatrixX<T>(size, ModelType::size_);
             Eigen::MatrixX<T> r = Eigen::MatrixX<T>(size, 1);
             Eigen::MatrixX<T> W(size, 1);
